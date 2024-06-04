@@ -54,4 +54,3 @@ document.querySelector('.load-more').addEventListener('click', async () => {
     hideLoader();
   }
 });
-t
