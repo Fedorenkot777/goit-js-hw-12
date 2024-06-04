@@ -1,86 +1,56 @@
+import iziToast from 'izitoast';
 import { fetchImages } from './js/pixabay-api';
-import {
-  renderImages,
-  showError,
-  clearGallery,
-  showLoader,
-  hideLoader,
-  refreshLightbox,
-  showLoaderBtn,
-  hideLoaderBtn,
-  smoothScrollToNextGroup,
-} from './js/render-functions';
+import { renderImages, showError, clearGallery, showLoader, hideLoader, toggleLoadMoreButton, } from './js/render-functions';
 
-const form = document.querySelector('.form');
-const searchInput = document.querySelector('.search-img-input');
-const loadmoreBtn = document.querySelector('.load-more');
+let currentPage = 1;
+let currentQuery = '';
 
-let query = '';
-let page = 1;
-let totalHits = 0;
 
-form.addEventListener('submit', handleSubmit);
-loadmoreBtn.addEventListener('click', handleLoadMore);
 
-async function handleSubmit(event) {
+document.querySelector('#search-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-
-  query = searchInput.value.trim();
-  page = 1;
-
+  const query = event.target.elements.searchQuery.value.trim();
   if (!query) {
-    showError('Please enter a search term');
+    showError('Please enter a search query');
     return;
   }
-
+  currentQuery = query;
+  currentPage = 1;
   clearGallery();
-  hideLoaderBtn();
+  toggleLoadMoreButton(false);
   showLoader();
-
   try {
-    const { hits, totalHits: total } = await fetchImages(query, page);
-    hideLoader();
-    totalHits = total;
-
-    if (hits.length === 0) {
-      showError(
-        'Sorry, there are no images matching your search query. Please try again!'
-      );
+    const data = await fetchImages(query);
+    if (data.hits.length === 0) {
+      showError('Sorry, there are no images matching your search query. Please try again!');
     } else {
-      renderImages(hits);
-
-      if (hits.length < 15 || total <= page * 15) {
-        hideLoaderBtn();
-        showEndMessage();
-      } else {
-        showLoaderBtn();
-      }
+      renderImages(data.hits, true);
+      toggleLoadMoreButton(data.totalHits > currentPage * 15);
     }
   } catch (error) {
+    showError(error.message);
+  } finally {
     hideLoader();
-    showError('An error occured while fetching images');
-    console.error(error);
   }
-}
+});
 
-async function handleLoadMore() {
-  page += 1;
+document.querySelector('.load-more').addEventListener('click', async () => {
+  currentPage += 1;
   showLoader();
-
   try {
-    const { hits } = await fetchImages(query, page);
-    hideLoader();
-    renderImages(hits, true);
-    refreshLightbox();
-    smoothScrollToNextGroup();
-
-    if (hits.length < 15 || totalHits <= page * 15) {
-      hideLoaderBtn();
-      showError("We're sorry, but you've reached the end of search results.");
+    const data = await fetchImages(currentQuery, currentPage);
+    renderImages(data.hits, false);
+    toggleLoadMoreButton(data.totalHits > currentPage * 15);
+    if (data.totalHits <= currentPage * 15) {
+      iziToast.info({
+        title: 'info',
+        message: 'Weare sorry, but you`ve reached the end of search result.',
+        position: 'topRight'
+      });
     }
   } catch (error) {
+    showError(error.message);
+  } finally {
     hideLoader();
-    showError('An error occured while fetching more images');
-    console.error(error);
   }
-}
+});
